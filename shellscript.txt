@@ -1,0 +1,72 @@
+check_permissions() {
+    local filename="$1"
+    if [ ! -r "$filename" ]; then
+        echo "File is not readable"
+        exit 1
+    fi
+    if [ ! -w "$filename" ]; then
+        echo "File is not writable"
+        exit 2
+    fi
+    if [ ! -x "$filename" ]; then
+        echo "File is not executable"
+        exit 3
+    fi
+}
+
+check_non_ascii() {
+    local filename="$1"
+    if grep -qP "[^\x00-\x7F]" "$filename"; then
+        echo "Non-ASCII characters found in the file"
+        exit 6
+    fi
+}
+
+# Verify if the file is a shell script
+if ! file "$1" | grep -q "shell script"; then
+    echo "Not a shell script"
+    exit 4
+fi
+
+# Check permissions of the file
+check_permissions "$1"
+
+# Check for non-ASCII characters in the file
+check_non_ascii "$1"
+
+# Check for specific patterns in the script content
+if grep -qE "eval|\$\(|\$\{|bash|curl|wget" "$1"; then
+    echo "Potentially malicious patterns found"
+    exit 5
+fi
+
+check_file_stats() {
+    local filename="$1"
+    local lines=$(wc -l < "$filename")
+    local words=$(wc -w < "$filename")
+    local chars=$(wc -c < "$filename")
+
+    # Check if the file contains fewer than 3 lines
+    if [ "$lines" -lt 3 ]; then
+        echo "File contains fewer than 3 lines"
+        exit 7
+    fi
+
+    # Check if the number of words exceeds 1000
+    if [ "$words" -gt 1000 ]; then
+        echo "Number of words exceeds 1000"
+        exit 8
+    fi
+
+    # Check if the number of characters exceeds 2000
+    if [ "$chars" -gt 2000 ]; then
+        echo "Number of characters exceeds 2000"
+        exit 9
+    fi
+}
+
+check_file_stats "$1"
+
+# If no malicious patterns found, display "Safe"
+echo "Safe"
+exit 0
